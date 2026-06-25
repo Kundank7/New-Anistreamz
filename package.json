@@ -1,0 +1,43 @@
+{
+  "name": "naivestream",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@carbon/icons-react": "^11.82.0",
+    "@radix-ui/react-tooltip": "^1.2.9",
+    "axios": "^1.17.0",
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^12.10.0",
+    "cheerio": "^1.2.0",
+    "clsx": "^2.1.1",
+    "jose": "^6.2.3",
+    "motion": "^12.40.0",
+    "next": "16.2.7",
+    "next-themes": "^0.4.6",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/bcrypt": "^6.0.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.7",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "allowScripts": {
+    "bcrypt@6.0.0": true
+  }
+}
