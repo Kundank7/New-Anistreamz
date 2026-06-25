@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const results = await AnimeService.advancedSearch({
-      query, genre, genres, genreMode, status, type, letter, year, season, rating, source, studio, studios, order, page, limit, titleLang
+      query,page,limit
     });
     return NextResponse.json({ ...results, items: sanitizeAnimeList(results.items) });
   } catch (error) {
