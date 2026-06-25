@@ -1,0 +1,285 @@
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+/* Enable manual dark mode toggling in Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Default (Light) Theme */
+  --color-background: #ECF5F0;
+  --color-foreground: #0A2617;
+  --color-primary: #D7E8DE;
+  --color-secondary: #16A34A;
+  --color-accent: #16A34A;
+  --color-card: #F4F9F6;
+  --color-card-foreground: #0A2617;
+  --color-border: #C5DACF;
+  --color-muted-text: #527A65;
+  --color-warning: #EAB308;
+  --color-danger: #DC2626;
+
+  --font-sans: 'Exo 2', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Orbitron', ui-serif, Georgia, serif;
+}
+
+/* Hard override for variable-based styling */
+.dark {
+  --color-background: #040D09;
+  --color-foreground: #ECFDF5;
+  --color-primary: #0A2118;
+  --color-secondary: #22C55E;
+  --color-accent: #22C55E;
+  --color-card: #081711;
+  --color-card-foreground: #ECFDF5;
+  --color-border: #113224;
+  --color-muted-text: #A1BBAF;
+  --color-warning: #FACC15;
+  --color-danger: #EF4444;
+}
+
+@layer base {
+  html {
+    scrollbar-width: thin !important;
+    scrollbar-color: var(--color-secondary) var(--color-background) !important;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased transition-colors duration-300;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif uppercase tracking-widest;
+  }
+
+  /* Hide alt text when image is loading/broken */
+  img {
+    color: transparent;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-6 py-3 bg-secondary text-white dark:text-black rounded-none font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 uppercase tracking-tighter cursor-pointer;
+    clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+  }
+
+  .btn-accent {
+    @apply px-6 py-3 border border-secondary text-secondary rounded-none font-bold transition-all hover:bg-secondary hover:text-white dark:hover:text-black active:scale-95 disabled:opacity-50 uppercase tracking-tighter cursor-pointer;
+    clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+  }
+
+  .card {
+    @apply bg-card border-l-2 border-r-2 border-secondary/30 rounded-none overflow-hidden transition-all hover:border-secondary hover:-translate-y-1;
+    position: relative;
+  }
+
+  .glass {
+    @apply bg-card/60 backdrop-blur-xl border border-border;
+  }
+}
+
+.anime-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .anime-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .anime-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .anime-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1.5rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .anime-grid {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1.5rem;
+  }
+}
+
+/* Standard Anime Grid (For Listing Pages) */
+.anime-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .anime-grid { grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+}
+
+@media (min-width: 1024px) {
+  .anime-grid { grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
+}
+
+@media (min-width: 1280px) {
+  .anime-grid { grid-template-columns: repeat(5, 1fr); gap: 1.5rem; }
+}
+
+@media (min-width: 1536px) {
+  .anime-grid { grid-template-columns: repeat(6, 1fr); gap: 1.5rem; }
+}
+
+/* Homepage Horizontal Scroll Layout (Mobile) */
+.mobile-snap-scroll {
+  @apply flex overflow-x-auto snap-x snap-mandatory scroll-smooth pb-4;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.mobile-snap-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-snap-scroll > * {
+  @apply min-w-[200px] max-w-[200px] shrink-0 snap-start;
+}
+
+@media (min-width: 768px) {
+  .mobile-snap-scroll {
+    @apply grid grid-cols-3 overflow-x-visible snap-none p-0;
+  }
+  .mobile-snap-scroll > * {
+    @apply min-w-0 max-w-none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .mobile-snap-scroll {
+    @apply grid-cols-4;
+  }
+}
+
+@media (min-width: 1280px) {
+  .mobile-snap-scroll {
+    @apply grid-cols-5;
+  }
+}
+
+@media (min-width: 1536px) {
+  .mobile-snap-scroll {
+    @apply grid-cols-6;
+  }
+}
+
+/* Custom Cyberpunk Utilities */
+@utility neon-glow {
+  box-shadow: 0 0 10px var(--color-secondary);
+}
+
+@utility text-neon {
+  text-shadow: 0 0 5px var(--color-secondary);
+}
+
+@utility clip-path-corner-tr {
+  clip-path: polygon(0 0, 70% 0, 100% 30%, 100% 100%, 0 100%);
+}
+
+@utility clip-path-polygon {
+  clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+}
+
+@utility clip-path-polygon-small {
+  clip-path: polygon(5% 0, 100% 0, 100% 70%, 95% 100%, 0 100%, 0 30%);
+}
+
+/* Custom Global Cyberpunk Scrollbar */
+::-webkit-scrollbar {
+  width: 10px !important;
+  height: 10px !important;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-background) !important;
+  border-left: none !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-secondary) !important;
+  border-radius: 0 !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted-text) !important;
+}
+
+/* Custom Scrollbar for smaller inner areas like Modals */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px !important;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent !important;
+  border-left: none !important;
+}
+
+/* View Transition API: Sword-Slice Effect */
+::view-transition-group(root) {
+  animation-duration: 0.7s;
+  animation-timing-function: cubic-bezier(0.19, 1, 0.22, 1); /* Expo-out approximation */
+}
+
+::view-transition-new(root) {
+  animation-name: reveal-light;
+  animation-fill-mode: both;
+}
+
+::view-transition-old(root) {
+  animation: none;
+  z-index: -1;
+}
+
+.dark::view-transition-new(root) {
+  animation-name: reveal-dark;
+}
+
+@keyframes reveal-dark {
+  from {
+    clip-path: polygon(50% -71%, -50% 71%, -50% 71%, 50% -71%);
+  }
+  to {
+    clip-path: polygon(50% -71%, -50% 71%, 50% 171%, 171% 50%);
+  }
+}
+
+@keyframes reveal-light {
+  from {
+    clip-path: polygon(171% 50%, 50% 171%, 50% 171%, 171% 50%);
+  }
+  to {
+    clip-path: polygon(171% 50%, 50% 171%, -50% 71%, 50% -71%);
+  }
+}
+
+
+
+
+/* View Modes Overrides */
+.anime-grid[data-view="detailed"] {
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.anime-grid[data-view="list"] {
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+@media (min-width: 768px) {
+  .anime-grid[data-view="list"] {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
