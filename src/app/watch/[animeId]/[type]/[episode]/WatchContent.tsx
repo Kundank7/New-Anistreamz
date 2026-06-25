@@ -176,10 +176,10 @@ const fetchEpisode = useCallback(async () => {
 
   try {
     const data = await getWatch(
-	  "reanime",
+	  "anikoto",
 	  Number(animeId),
 	  type,
-	  `reanime-${episode}`
+	  `anikoto-${episode}`
 	);
 	
     setEpisodeData(data);
@@ -227,13 +227,13 @@ const fetchEpisode = useCallback(async () => {
 
     const episodeList =
       type === "dub"
-        ? data?.reanime?.dub || []
-        : data?.reanime?.sub || [];
+        ? data?.anikoto?.dub || []
+        : data?.anikoto?.sub || [];
 
     const providerEpisodes =
   type === "dub"
-    ? data?.reanime?.episodes?.dub
-    : data?.reanime?.episodes?.sub;
+    ? data?.anikoto?.episodes?.dub
+    : data?.anikoto?.episodes?.sub;
 
 setAnimeData({
   episodeList: (providerEpisodes || []).map((ep: any) => ({
