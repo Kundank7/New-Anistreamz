@@ -118,11 +118,11 @@ export default function WatchContent({
       if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey) {
         setIsCinemaMode(prev => !prev);
       }
-      if (e.key.toLowerCase() === 'n' && e.shiftKey && nextEp) {
-        router.push(`/watch/${animeId}/${type}/${nextEp.eps}`);
-      }
-      if (e.key.toLowerCase() === 'p' && e.shiftKey && prevEp) {
+      if (e.key.toLowerCase() === 'n' && e.shiftKey && prevEp) {
         router.push(`/watch/${animeId}/${type}/${prevEp.eps}`);
+      }
+      if (e.key.toLowerCase() === 'p' && e.shiftKey && nextEp) {
+        router.push(`/watch/${animeId}/${type}/${nextEp.eps}`);
       }
     };
 
