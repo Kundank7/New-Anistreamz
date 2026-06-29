@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import React, { useEffect, useState, Suspense, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getWatch, getEpisodes } from '@/lib/services/anivexa';
 import { useHistory } from '@/lib/hooks/useHistory';
@@ -12,13 +12,12 @@ import { motion } from 'motion/react';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { LazyIframe } from '@/components/ui/LazyIframe';
-// import { HLSPlayer } from '@/components/ui/HLSPlayer'; // Placeholder for your HLS Player component
 import { cn } from '@/lib/utils';
 import { getAnimeById } from '@/lib/services/anilist';
 
 export default function WatchContent({
   animeId,
-  type,
+  type, // Keeping property definition for signature compatibility, though logic is forced to dub
   episode
 }: {
   animeId: string;
@@ -32,11 +31,11 @@ export default function WatchContent({
   const [animeData, setAnimeData] = useState<any>(null);
   const [animeTitle, setAnimeTitle] = useState('');
   const [animeImg, setAnimeImg] = useState('');
+  const [rawTitle, setRawTitle] = useState('');
   const [rawTitleEnglish, setRawTitleEnglish] = useState('');
 
-  const displayTitle = titleLang === 'en' && rawTitleEnglish ? rawTitleEnglish : animeTitle;
-  
-  const episodeDisplay = useMemo(() => {
+  const displayTitle = titleLang === 'en' && rawTitleEnglish ? rawTitleEnglish : (rawTitle || animeTitle);
+  const episodeDisplay = React.useMemo(() => {
     if (!episodeData?.title) return `Episode ${episode}`;
     const match = episodeData.title.match(/Episode\s*(\d+(\.\d+)?)/i);
     return match ? `Episode ${match[1]}` : episodeData.title;
@@ -45,12 +44,6 @@ export default function WatchContent({
   const [currentUrl, setCurrentUrl] = useState<string>('');
   const [currentResolution, setCurrentResolution] = useState<string>('');
   const [currentServer, setCurrentServer] = useState<string>('');
-  const [watchType, setWatchType] = useState<'dub' | 'sub'>(type === 'dub' ? 'dub' : 'sub');
-  const [currentPlayerType, setCurrentPlayerType] = useState<'hls' | 'embed'>('embed');
-  const [subtitles, setSubtitles] = useState<any[]>([]);
-  const [intro, setIntro] = useState<any>(null);
-  const [outro, setOutro] = useState<any>(null);
-
   const [loading, setLoading] = useState(true);
   const [serverLoading, setServerLoading] = useState(false);
   const [isCinemaMode, setIsCinemaMode] = useState(false);
@@ -59,16 +52,10 @@ export default function WatchContent({
   const [forceLoadIframe, setForceLoadIframe] = useState(false);
   const { saveToHistory } = useHistory();
   const { markAsWatched } = useWatchedEpisodes();
-  const activeEpisodeRef = useRef<HTMLAnchorElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const activeEpisodeRef = React.useRef<HTMLAnchorElement>(null);
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
-  // Sync watch type when URL type param changes
-  useEffect(() => {
-    setWatchType(type === "dub" ? "dub" : "sub");
-  }, [type]);
-
-  // Derived next/prev episodes from database list for better reliability
-  const { prevEp, nextEp } = useMemo(() => {
+  const { prevEp, nextEp } = React.useMemo(() => {
     if (!animeData?.episodeList || animeData.episodeList.length === 0) return { prevEp: null, nextEp: null };
     
     const list = animeData.episodeList;
@@ -84,7 +71,6 @@ export default function WatchContent({
     return { prevEp: prev, nextEp: next };
   }, [animeData, episode]);
 
-  // Auto-scroll to active episode
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     if (activeEpisodeRef.current && scrollContainerRef.current && !loading) {
@@ -101,7 +87,6 @@ export default function WatchContent({
     };
   }, [episode, loading, animeData]);
 
-  // Load Theater Mode preference
   useEffect(() => {
     const saved = localStorage.getItem('theaterMode');
     if (saved === 'true') {
@@ -117,7 +102,6 @@ export default function WatchContent({
     });
   }, []);
 
-  // Handle Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) return;
@@ -132,10 +116,10 @@ export default function WatchContent({
         setIsCinemaMode(prev => !prev);
       }
       if (e.key.toLowerCase() === 'n' && e.shiftKey && nextEp) {
-        router.push(`/watch/${animeId}/${type}/${nextEp.eps}`);
+        router.push(`/watch/${animeId}/dub/${nextEp.eps}`);
       }
       if (e.key.toLowerCase() === 'p' && e.shiftKey && prevEp) {
-        router.push(`/watch/${animeId}/${type}/${prevEp.eps}`);
+        router.push(`/watch/${animeId}/dub/${prevEp.eps}`);
       }
     };
 
@@ -143,7 +127,7 @@ export default function WatchContent({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isCinemaMode, toggleTheaterMode, prevEp, nextEp, router, animeId, type]);
+  }, [isCinemaMode, toggleTheaterMode, prevEp, nextEp, router, animeId]);
 
   const [historySaved, setHistorySaved] = useState(false);
   
@@ -152,10 +136,10 @@ export default function WatchContent({
   }, [episode]);
 
   useEffect(() => {
-    if (!episodeData || historySaved) return;
+    if (!episodeData || !rawTitle || historySaved) return;
     saveToHistory({
       animeId,
-      animeTitle: animeTitle,
+      animeTitle: rawTitle || animeTitle,
       animeTitleEnglish: rawTitleEnglish || undefined,
       animeImage: animeImg,
       lastEpisodeId: episode,
@@ -163,59 +147,46 @@ export default function WatchContent({
     });
     markAsWatched(animeId, episode);
     setHistorySaved(true);
-  }, [episodeData, rawTitleEnglish, animeId, animeImg, episode, saveToHistory, markAsWatched, historySaved, animeTitle]);
+  }, [episodeData, rawTitle, rawTitleEnglish, animeId, animeImg, episode, saveToHistory, markAsWatched, historySaved, animeTitle]);
 
   const fetchEpisode = useCallback(async () => {
     if (!animeId || !episode) return;
 
     setLoading(true);
     try {
+      // Forcing payload selection parameters specifically to "dub" context
       const data = await getWatch(
         "anikoto",
         Number(animeId),
-        type,
+        "dub",
         `anikoto-${episode}`
       );
       
-      const targetPayload = type === "dub" ? data?.sdub : data?.ssub;
+      // Directly matching your target "sdub" structural field payload
+      const targetPayload = data?.sdub;
       
       if (targetPayload && targetPayload.streams) {
         const mappedServers = targetPayload.streams.map((s: any) => ({
-          name: s.server,
-          url: s.url,
+          name: `${s.server} (DUB)`,
+          embed: s.url,
           type: s.type,
-          referer: s.referer,
           isDefault: s.default || false
         }));
 
         setEpisodeData({
           title: `Episode ${episode}`,
           allServers: mappedServers,
-          subtitles: targetPayload.subtitles || [],
-          intro: targetPayload.intro || null,
-          outro: targetPayload.outro || null,
           downloadUrl: data?.downloadUrl || null
         });
 
-        setSubtitles(targetPayload.subtitles || []);
-        setIntro(targetPayload.intro || null);
-        setOutro(targetPayload.outro || null);
-
-        // Restore preferred server selection if available
-        const savedServer = localStorage.getItem("preferred-server");
-        const saved = mappedServers.find((s: any) => s.name === savedServer);
-
+        // Safe setup prioritization: matching structural default configs or first available node
         const preferredServer = 
-          saved ||
-          mappedServers.find((s: any) => s.isDefault) ||
-          mappedServers.find((s: any) => s.type === "hls") ||
-          mappedServers.find((s: any) => s.type === "embed") || 
+          mappedServers.find((s: any) => s.isDefault) || 
           mappedServers[0];
 
         if (preferredServer) {
           setCurrentServer(preferredServer.name);
-          setCurrentUrl(preferredServer.url);
-          setCurrentPlayerType(preferredServer.type);
+          setCurrentUrl(preferredServer.embed);
         }
       } else {
         setEpisodeData(null);
@@ -233,24 +204,14 @@ export default function WatchContent({
     } finally {
       setLoading(false);
     }
-  }, [animeId, type, episode]);
+  }, [animeId, episode]);
 
   const fetchAnimeDataFrom = useCallback(async () => {
     try {
       const data = await getEpisodes(Number(animeId));
 
-      const providerEpisodes =
-        type === "dub"
-          ? data?.anikoto?.episodes?.dub
-          : data?.anikoto?.episodes?.sub;
-
-      const hasDub = data?.anikoto?.episodes?.dub?.length > 0;
-
-		// Only redirect if type is missing
-		if (!type && hasDub) {
-			router.replace(`/watch/${animeId}/dub/${episode}`);
-			return;
-		}
+      // Strictly query only the dubbed database stream index
+      const providerEpisodes = data?.anikoto?.episodes?.dub;
 
       setAnimeData({
         episodeList: (providerEpisodes || []).map((ep: any) => ({
@@ -262,7 +223,7 @@ export default function WatchContent({
     } catch (err) {
       console.error(err);
     }
-  }, [animeId, type, episode, router]);
+  }, [animeId]);
 
   useEffect(() => {
     fetchEpisode();
@@ -308,25 +269,8 @@ export default function WatchContent({
               </div>
               <Skeleton className="h-[42px] w-full mt-2 rounded-none" />
             </div>
-            <div className="bg-card/50 p-6 space-y-6" style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}>
-              <div className="flex items-center space-x-2 pb-3 mb-4 border-b border-border">
-                <Skeleton className="w-1 h-4 rounded-none" />
-                <Skeleton className="w-3.5 h-3.5 rounded-none" />
-                <Skeleton className="h-3 w-24 rounded-none" />
-              </div>
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="space-y-3">
-                  <Skeleton className="h-4 w-20 rounded-none" />
-                  <div className="flex flex-wrap gap-2">
-                    <Skeleton className="h-[34px] w-[88px] rounded-none" />
-                    <Skeleton className="h-[34px] w-[88px] rounded-none" />
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
-        <Skeleton className="h-48 w-full mt-6 rounded-none" />
       </div>
     );
   }
@@ -354,29 +298,11 @@ export default function WatchContent({
         </div>
       </div>
 
-      {/* Sub/Dub Toggle Selection Header */}
-      <div className="flex gap-2 mb-4">
-        <Link
-          href={`/watch/${animeId}/dub/${episode}`}
-          className={cn(
-            "btn-primary px-4 py-2 text-xs font-bold uppercase tracking-wider",
-            watchType !== "dub" && "opacity-50"
-          )}
-        >
-          Dub
-        </Link>
-        <Link
-          href={`/watch/${animeId}/sub/${episode}`}
-          className={cn(
-            "btn-primary px-4 py-2 text-xs font-bold uppercase tracking-wider",
-            watchType !== "sub" && "opacity-50"
-          )}
-        >
-          Sub
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-x-8 gap-y-6">
+      <div className={cn(
+        "grid gap-x-8 gap-y-6",
+        isTheaterMode ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-[1fr_350px]"
+      )}>
+        
         {/* Cinema Mode Overlay */}
         {isCinemaMode && (
           <div
@@ -388,50 +314,42 @@ export default function WatchContent({
         )}
 
         {isCinemaMode && (
-          <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 px-4 py-2 bg-card/80 border border-secondary/30 text-secondary text-[10px] font-mono font-black uppercase tracking-widest shadow-[0_0_15px_rgba(34,197,94,0.15)] z-[70] transition-opacity duration-300 ${showExitHint ? 'opacity-100' : 'opacity-0'}`}
+          <div className={cn(
+            "fixed bottom-8 left-1/2 -translate-x-1/2 px-4 py-2 bg-card/80 border border-secondary/30 text-secondary text-[10px] font-mono font-black uppercase tracking-widest shadow-[0_0_15px_rgba(34,197,94,0.15)] z-[70] transition-opacity duration-300",
+            showExitHint ? 'opacity-100' : 'opacity-0'
+          )}
             style={{ clipPath: 'polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px)' }}
           >
             Click to Exit Focus Mode
           </div>
         )}
 
-        {/* Main Content: Video Player Wrapper */}
-        <motion.div layout transition={{ duration: 0.1, ease: 'easeInOut' }} className={`self-start ${isCinemaMode ? 'relative z-[60]' : ''} ${isTheaterMode ? 'lg:col-span-2' : 'lg:col-span-1'}`}>
-          
-          {/* Mobile Title */}
+        {/* Video Column */}
+        <div className="space-y-4">
           <div className="lg:hidden mb-4 p-4 sm:p-5 bg-card border-l-4 border-secondary shadow-md">
             <h1 className="text-base sm:text-lg font-serif font-black tracking-tighter uppercase leading-tight">{displayTitle}{episodeDisplay ? ` ${episodeDisplay}` : ''}</h1>
             <p className="text-secondary font-bold text-[10px] mt-2 tracking-[0.2em] uppercase opacity-60">Streaming</p>
           </div>
 
-          <div className={`relative aspect-video bg-black border-b-4 border-secondary/20 shadow-2xl overflow-hidden group transition-all duration-500 ${isCinemaMode ? 'shadow-[0_0_50px_rgba(34,197,94,0.15)] ring-1 ring-secondary/30' : ''}`}>
+          <div className={cn(
+            "relative aspect-video bg-black border-b-4 border-secondary/20 shadow-2xl overflow-hidden group transition-all duration-500",
+            isCinemaMode ? 'shadow-[0_0_50px_rgba(34,197,94,0.15)] ring-1 ring-secondary/30 relative z-[60]' : ''
+          )}>
             {serverLoading && (
               <div className="absolute inset-0 z-20 bg-black/60 backdrop-blur-sm flex items-center justify-center">
                 <Renew className="w-10 h-10 text-secondary animate-spin" />
               </div>
             )}
-            
-            {/* Conditional Video Stream/Embed Engine Integration */}
             {currentUrl && currentUrl !== 'No iframe found' ? (
-              currentPlayerType === "embed" ? (
-                <LazyIframe
-                  src={currentUrl}
-                  title="Episode Video Player"
-                  poster={animeImg}
-                  overlayText={episodeDisplay ? `PLAY ${episodeDisplay.toUpperCase()}` : "PLAY EPISODE"}
-                  className="absolute inset-0 w-full h-full"
-                  forceLoad={forceLoadIframe}
-                />
-              ) : (
-                <LazyIframe
-				src={currentUrl}
-				title="Episode Video Player"
-				poster={animeImg}
-				overlayText={episodeDisplay ? `PLAY ${episodeDisplay.toUpperCase()}` : "PLAY EPISODE"}
-				className="absolute inset-0 w-full h-full"
-				forceLoad={forceLoadIframe}
-			/>
-              )
+              <LazyIframe
+                key={currentUrl}
+                src={currentUrl}
+                title="Episode Video Player"
+                poster={animeImg}
+                overlayText={episodeDisplay ? `PLAY ${episodeDisplay.toUpperCase()}` : "PLAY EPISODE"}
+                className="absolute inset-0 w-full h-full"
+                forceLoad={forceLoadIframe}
+              />
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center px-4">
                 <Video className="w-12 h-12 text-muted-text mb-4" />
@@ -441,7 +359,7 @@ export default function WatchContent({
             <div className="absolute inset-0 pointer-events-none border-x border-border z-10" />
           </div>
 
-          <div className={`hidden lg:flex items-center gap-4 transition-all duration-500 self-start ${isCinemaMode ? 'relative z-[60]' : ''}`}>
+          <div className={cn("hidden lg:flex items-center gap-4", isCinemaMode ? "relative z-[60]" : "")}>
             <div
               className="px-6 py-4 bg-card shadow-lg relative overflow-hidden group flex-grow"
               style={{ clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%)' }}
@@ -459,7 +377,10 @@ export default function WatchContent({
               <Tooltip content={isTheaterMode ? 'Default View (T)' : 'Theater Mode (T)'} position="top">
                 <button
                   onClick={toggleTheaterMode}
-                  className={`p-3 transition-all border ${isTheaterMode ? 'bg-secondary text-white dark:text-black border-secondary shadow-[0_0_20px_rgba(34,197,94,0.4)]' : 'bg-secondary/10 text-secondary hover:bg-secondary hover:text-white dark:hover:text-black border-secondary/30 hover:border-secondary shadow-[0_0_10px_rgba(34,197,94,0.1)] hover:shadow-[0_0_20px_rgba(34,197,94,0.4)]'}`}
+                  className={cn(
+                    "p-3 transition-all border",
+                    isTheaterMode ? 'bg-secondary text-white dark:text-black border-secondary shadow-[0_0_20px_rgba(34,197,94,0.4)]' : 'bg-secondary/10 text-secondary hover:bg-secondary hover:text-white dark:hover:text-black border-secondary/30 hover:border-secondary shadow-[0_0_10px_rgba(34,197,94,0.1)] hover:shadow-[0_0_20px_rgba(34,197,94,0.4)]'
+                  )}
                   style={{ clipPath: 'polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px)' }}
                 >
                   <Theater className="w-4 h-4" />
@@ -468,7 +389,10 @@ export default function WatchContent({
               <Tooltip content={isCinemaMode ? 'Exit Focus (F)' : 'Focus Mode (F)'} position="top">
                 <button
                   onClick={() => setIsCinemaMode(!isCinemaMode)}
-                  className={`p-3 transition-all border ${isCinemaMode ? 'bg-secondary text-white dark:text-black border-secondary shadow-[0_0_20px_rgba(34,197,94,0.4)]' : 'bg-secondary/10 text-secondary hover:bg-secondary hover:text-white dark:hover:text-black border-secondary/30 hover:border-secondary shadow-[0_0_10px_rgba(34,197,94,0.1)] hover:shadow-[0_0_20px_rgba(34,197,94,0.4)]'}`}
+                  className={cn(
+                    "p-3 transition-all border",
+                    isCinemaMode ? 'bg-secondary text-white dark:text-black border-secondary shadow-[0_0_20px_rgba(34,197,94,0.4)]' : 'bg-secondary/10 text-secondary hover:bg-secondary hover:text-white dark:hover:text-black border-secondary/30 hover:border-secondary shadow-[0_0_10px_rgba(34,197,94,0.1)] hover:shadow-[0_0_20px_rgba(34,197,94,0.4)]'
+                  )}
                   style={{ clipPath: 'polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px)' }}
                 >
                   <Screen className="w-4 h-4" />
@@ -476,12 +400,15 @@ export default function WatchContent({
               </Tooltip>
             </div>
           </div>
-        </motion.div>
+        </div>
 
-        {/* Sidebar: Controls & Info */}
-        <div className={`w-full ${isTheaterMode ? 'lg:col-span-2 grid lg:grid-cols-[350px_1fr] lg:gap-8 lg:items-stretch space-y-8 lg:space-y-0' : 'lg:col-span-1 lg:col-start-2 lg:row-span-2 space-y-8'} shrink-0`}>
+        {/* Sidebar Controls */}
+        <div className={cn(
+          "w-full shrink-0 space-y-6",
+          isTheaterMode ? "grid grid-cols-1 md:grid-cols-2 gap-6 space-y-0" : ""
+        )}>
           <div
-            className="bg-card/50 border-l-4 border-secondary/50 p-6 space-y-4 relative overflow-hidden"
+            className="bg-card/50 border-l-4 border-secondary/50 p-6 space-y-4 relative overflow-hidden h-full"
             style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}
           >
             <div className="flex items-center space-x-2 border-b border-border pb-3 mb-4 relative z-10">
@@ -493,35 +420,31 @@ export default function WatchContent({
               {prevEp ? (
                 <Tooltip content="Shift + P" position="top" wrapperClassName="w-full">
                   <Link
-                    href={`/watch/${animeId}/${type}/${prevEp.eps}`}
+                    href={`/watch/${animeId}/dub/${prevEp.eps}`}
                     className="btn-accent w-full py-2.5 text-[10px] tracking-[0.2em] flex items-center justify-center text-center"
                   >
                     Prev
                   </Link>
                 </Tooltip>
               ) : (
-                <Tooltip content="Shift + P" position="top" wrapperClassName="w-full">
-                  <div className="btn-accent w-full py-2.5 text-[10px] tracking-[0.2em] flex items-center justify-center text-center opacity-30 pointer-events-none grayscale cursor-not-allowed">
-                    Prev
-                  </div>
-                </Tooltip>
+                <div className="btn-accent w-full py-2.5 text-[10px] tracking-[0.2em] flex items-center justify-center text-center opacity-30 pointer-events-none grayscale cursor-not-allowed">
+                  Prev
+                </div>
               )}
 
               {nextEp ? (
                 <Tooltip content="Shift + N" position="top" wrapperClassName="w-full">
                   <Link
-                    href={`/watch/${animeId}/${type}/${nextEp.eps}`}
+                    href={`/watch/${animeId}/dub/${nextEp.eps}`}
                     className="btn-primary w-full py-2.5 text-[10px] tracking-[0.2em] flex items-center justify-center text-center"
                   >
                     Next
                   </Link>
                 </Tooltip>
               ) : (
-                <Tooltip content="Shift + N" position="top" wrapperClassName="w-full">
-                  <div className="btn-primary w-full py-2.5 text-[10px] tracking-[0.2em] flex items-center justify-center text-center opacity-30 pointer-events-none grayscale cursor-not-allowed">
-                    Next
-                  </div>
-                </Tooltip>
+                <div className="btn-primary w-full py-2.5 text-[10px] tracking-[0.2em] flex items-center justify-center text-center opacity-30 pointer-events-none grayscale cursor-not-allowed">
+                  Next
+                </div>
               )}
             </div>
             
@@ -541,11 +464,13 @@ export default function WatchContent({
                       <Link
                         key={ep.episodeId}
                         ref={isActive ? (activeEpisodeRef as any) : null}
-                        href={`/watch/${animeId}/${type}/${ep.eps}`}
-                        className={`w-full aspect-square flex items-center justify-center text-xs font-bold transition-all ${isActive
+                        href={`/watch/${animeId}/dub/${ep.eps}`}
+                        className={cn(
+                          "w-full aspect-square flex items-center justify-center text-xs font-bold transition-all",
+                          isActive
                             ? 'bg-secondary text-background shadow-[0_0_10px_rgba(34,197,94,0.3)] pointer-events-none'
                             : 'bg-background hover:bg-secondary/20 border border-border hover:border-secondary/50 text-foreground/70 hover:text-secondary'
-                          }`}
+                        )}
                         title={ep.title}
                       >
                         {epNum}
@@ -566,9 +491,9 @@ export default function WatchContent({
             </div>
           </div>
 
-          {/* Video Servers Interactive Panel */}
+          {/* Servers Panel */}
           <div
-            className="bg-card/50 border-l-4 border-secondary/30 p-6 space-y-6 relative"
+            className="bg-card/50 border-l-4 border-secondary/30 p-6 space-y-6 relative h-full"
             style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}
           >
             <div className="flex items-center space-x-2 border-b border-border pb-3 mb-4 relative z-10">
@@ -579,12 +504,10 @@ export default function WatchContent({
             <div className="flex flex-wrap gap-2">
               {episodeData?.allServers?.map((server: any) => (
                 <button
-                  key={`${server.name}-${server.type}`}
+                  key={server.name}
                   onClick={() => {
-                    setCurrentUrl(server.url);
+                    setCurrentUrl(server.embed);
                     setCurrentServer(server.name);
-                    setCurrentPlayerType(server.type);
-                    localStorage.setItem("preferred-server", server.name);
                   }}
                   className={cn(
                     "px-3 py-2 bg-background/50 border-l-2 text-[10px] font-bold uppercase tracking-tighter hover:bg-secondary/10 hover:border-secondary hover:text-secondary transition-all",
@@ -597,15 +520,13 @@ export default function WatchContent({
             </div>
           </div>
         </div>
+
       </div>
 
       {/* Full-Width Bottom Download Links */}
       {episodeData?.downloadUrl?.qualities && episodeData.downloadUrl.qualities.length > 0 && (
         <div 
-          className={cn(
-            "bg-card/50 border-y border-secondary/30 p-10 relative overflow-hidden mb-12",
-            isTheaterMode ? "mt-6" : "mt-8 lg:mt-12"
-          )}
+          className="bg-card/50 border-y border-secondary/30 p-10 relative overflow-hidden mb-12 mt-8 lg:mt-12"
           style={{ clipPath: 'polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px)' }}
         >
           <div className="flex flex-col items-center mb-12 relative z-10 text-center">
