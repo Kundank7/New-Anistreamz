@@ -493,15 +493,15 @@ export default function WatchContent({
 
           {/* Servers Panel */}
           <div
-            className="bg-card/50 border-l-4 border-secondary/30 p-6 space-y-6 relative"
-            style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}
-          >
+            className="bg-card/50 border-l-4 border-secondary/30 p-6 space-y-6 relative h-40%"
+            style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}
+          >
             <div className="flex items-center space-x-2 border-b border-border pb-3 mb-4 relative z-10">
-              <div className="w-1 h-4 bg-secondary" />
-              <Video className="w-3.5 h-3.5 text-secondary" />
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-text">Video Servers</h3>
-            </div>
-            <div className="flex flex-wrap gap-2">
+              <div className="w-1 h-4 bg-secondary" />
+              <Video className="w-3.5 h-3.5 text-secondary" />
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-text">Video Servers</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
               {episodeData?.allServers?.map((server: any) => (
                 <button
                   key={server.name}
@@ -509,20 +509,11 @@ export default function WatchContent({
                     setCurrentUrl(server.embed);
                     setCurrentServer(server.name);
                   }}
-                  className="
-                    px-3 py-2
-                    bg-background/50
-                    border-l-2
-                    border-secondary/20
-                    text-[10px]
-                    font-bold
-                    uppercase
-                    tracking-tighter
-                    hover:bg-secondary/10
-                    hover:border-secondary
-                    hover:text-secondary
-                  "
-                >
+                  className={cn(
+                    "px-3 py-2 bg-background/50 border-l-2 text-[10px] font-bold uppercase tracking-tighter hover:bg-secondary/10 hover:border-secondary hover:text-secondary transition-all",
+                    currentServer === server.name ? "border-secondary text-secondary bg-secondary/5" : "border-secondary/20 text-foreground/70"
+                  )}
+                >
                   {server.name}
                 </button>
               ))}
