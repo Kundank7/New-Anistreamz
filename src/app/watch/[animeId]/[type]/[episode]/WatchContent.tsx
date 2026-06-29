@@ -118,11 +118,11 @@ export default function WatchContent({
       if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey) {
         setIsCinemaMode(prev => !prev);
       }
-      if (e.key.toLowerCase() === 'n' && e.shiftKey && prevEp) {
-        router.push(`/watch/${animeId}/${type}/${prevEp.eps}`);
-      }
-      if (e.key.toLowerCase() === 'p' && e.shiftKey && nextEp) {
+      if (e.key.toLowerCase() === 'n' && e.shiftKey && nextEp) {
         router.push(`/watch/${animeId}/${type}/${nextEp.eps}`);
+      }
+      if (e.key.toLowerCase() === 'p' && e.shiftKey && prevEp) {
+        router.push(`/watch/${animeId}/${type}/${prevEp.eps}`);
       }
     };
 
@@ -420,7 +420,7 @@ export default function WatchContent({
               {prevEp ? (
                 <Tooltip content="Shift + P" position="top" wrapperClassName="w-full">
                   <Link
-                    href={`/watch/${animeId}/${type}/${prevEp.eps}`}
+                    href={`/watch/${animeId}/${type}/${nextEp.eps}`}
                     className="btn-accent w-full py-2.5 text-[10px] tracking-[0.2em] flex items-center justify-center text-center"
                   >
                     Prev
@@ -435,7 +435,7 @@ export default function WatchContent({
               {nextEp ? (
                 <Tooltip content="Shift + N" position="top" wrapperClassName="w-full">
                   <Link
-                    href={`/watch/${animeId}/${type}/${nextEp.eps}`}
+                    href={`/watch/${animeId}/${type}/${prevEp.eps}`}
                     className="btn-primary w-full py-2.5 text-[10px] tracking-[0.2em] flex items-center justify-center text-center"
                   >
                     Next
@@ -493,7 +493,7 @@ export default function WatchContent({
 
           {/* Servers Panel */}
           <div
-            className="bg-card/50 border-l-4 border-secondary/30 p-6 space-y-6 relative h-50%"
+            className="bg-card/50 border-l-4 border-secondary/30 p-6 space-y-6 relative h-50"
             style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}
           >
             <div className="flex items-center space-x-2 border-b border-border pb-3 mb-4 relative z-10">
