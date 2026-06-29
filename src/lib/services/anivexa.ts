@@ -1,4 +1,4 @@
-const API = "https://new-anistreamz-api.onrender.com";
+const API = "http://129.80.214.186:4000";
 
 export async function getEpisodes(anilistId: number) {
   const res = await fetch(`${API}/episodes/${anilistId}`);
