@@ -55,7 +55,6 @@ export default function WatchContent({
   const activeEpisodeRef = React.useRef<HTMLAnchorElement>(null);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
-  // Derived next/prev episodes from database list for better reliability
   const { prevEp, nextEp } = React.useMemo(() => {
     if (!animeData?.episodeList || animeData.episodeList.length === 0) return { prevEp: null, nextEp: null };
     
@@ -72,7 +71,6 @@ export default function WatchContent({
     return { prevEp: prev, nextEp: next };
   }, [animeData, episode]);
 
-  // Auto-scroll to active episode
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     if (activeEpisodeRef.current && scrollContainerRef.current && !loading) {
@@ -89,7 +87,6 @@ export default function WatchContent({
     };
   }, [episode, loading, animeData]);
 
-  // Load Theater Mode preference
   useEffect(() => {
     const saved = localStorage.getItem('theaterMode');
     if (saved === 'true') {
@@ -105,7 +102,6 @@ export default function WatchContent({
     });
   }, []);
 
-  // Handle Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) return;
@@ -166,28 +162,46 @@ export default function WatchContent({
         `anikoto-${episode}`
       );
       
-      // Dynamic fallback extraction for sub (ssub) and dub (sdub) objects
-      const targetPayload = type === "dub" ? data?.sdub : data?.ssub;
-      
-      if (targetPayload && targetPayload.streams) {
-        // Map native 'streams' to match component definitions
-        const mappedServers = targetPayload.streams.map((s: any) => ({
-          name: `${s.server} (${type.toUpperCase()})`,
-          embed: s.url,
-          type: s.type,
-          isDefault: s.default || false
-        }));
+      const mappedServers: any[] = [];
 
+      // 1. Gather Sub Streams if available
+      if (data?.ssub?.streams) {
+        data.ssub.streams.forEach((s: any) => {
+          mappedServers.push({
+            name: `${s.server} (SUB)`,
+            embed: s.url,
+            type: s.type,
+            isDefault: s.default || false,
+            lang: 'sub'
+          });
+        });
+      }
+
+      // 2. Gather Dub Streams if available 
+      if (data?.sdub?.streams) {
+        data.sdub.streams.forEach((s: any) => {
+          mappedServers.push({
+            name: `${s.server} (DUB)`,
+            embed: s.url,
+            type: s.type,
+            isDefault: s.default || false,
+            lang: 'dub'
+          });
+        });
+      }
+      
+      if (mappedServers.length > 0) {
         setEpisodeData({
           title: `Episode ${episode}`,
           allServers: mappedServers,
           downloadUrl: data?.downloadUrl || null
         });
 
-        // Auto-select preferred fallback server (Default stream or structural embed options)
+        // Smart auto-selection matching the route format context (prefers current sub/dub setting)
         const preferredServer = 
-          mappedServers.find((s: any) => s.type === "embed" && s.isDefault) ||
-          mappedServers.find((s: any) => s.type === "embed") || 
+          mappedServers.find((s: any) => s.lang === type && s.type === "embed" && s.isDefault) ||
+          mappedServers.find((s: any) => s.lang === type && s.type === "embed") ||
+          mappedServers.find((s: any) => s.lang === type) ||
           mappedServers[0];
 
         if (preferredServer) {
