@@ -417,7 +417,7 @@ export default function WatchContent({
               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-text">Navigation</h3>
             </div>
             <div className="grid grid-cols-2 gap-3 relative z-10">
-              {prevEp ? (
+              {nextEp ? (
                 <Tooltip content="Shift + P" position="top" wrapperClassName="w-full">
                   <Link
                     href={`/watch/${animeId}/${type}/${nextEp.eps}`}
@@ -432,7 +432,7 @@ export default function WatchContent({
                 </div>
               )}
 
-              {nextEp ? (
+              {prevEp ? (
                 <Tooltip content="Shift + N" position="top" wrapperClassName="w-full">
                   <Link
                     href={`/watch/${animeId}/${type}/${prevEp.eps}`}
