@@ -403,15 +403,12 @@ export default function WatchContent({
         </div>
 
         {/* Sidebar Controls */}
-        <div
-            className={cn(
-              "w-full shrink-0 flex flex-col gap-6",
-              !isTheaterMode && "lg:max-h-[calc(100vh-140px)] lg:sticky lg:top-20",
-              isTheaterMode && "grid grid-cols-1 md:grid-cols-2"
-            )}
-          >
+        <div className={cn(
+          "w-full shrink-0 space-y-6",
+          isTheaterMode ? "grid grid-cols-1 md:grid-cols-2 gap-6 space-y-0" : ""
+        )}>
           <div
-            className="bg-card/50 border-l-4 border-secondary/50 p-6 relative overflow-hidden flex flex-col min-h-0"
+            className="bg-card/50 border-l-4 border-secondary/50 p-6 space-y-4 relative overflow-hidden h-full"
             style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}
           >
             <div className="flex items-center space-x-2 border-b border-border pb-3 mb-4 relative z-10">
@@ -454,10 +451,10 @@ export default function WatchContent({
             {animeData?.episodeList && animeData.episodeList.length > 0 && (
               <div className="mt-6 space-y-3 relative z-10">
                 <h4 className="font-bold text-xs uppercase tracking-[0.2em] text-muted-text">All Episodes</h4>
-                <div
-                  ref={scrollContainerRef}
-                  className="grid grid-cols-5 gap-2 flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar"
-                >
+                <div 
+                  ref={scrollContainerRef}
+                  className="grid grid-cols-5 gap-2 max-h-[130px] overflow-y-auto pr-2 custom-scrollbar"
+                >
                   {animeData.episodeList.map((ep: any, index: number) => {
                     const epMatch = ep.title.match(/Episode\s+(\d+(\.\d+)?)/i);
                     const epNum = epMatch ? epMatch[1] : (index + 1);
@@ -496,15 +493,15 @@ export default function WatchContent({
 
           {/* Servers Panel */}
           <div
-            className="bg-card/50 border-l-4 border-secondary/30 p-6 space-y-6 relative shrink-0"
-            style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}
-          >
+            className="bg-card/50 border-l-4 border-secondary/30 p-6 space-y-6 relative"
+            style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}
+          >
             <div className="flex items-center space-x-2 border-b border-border pb-3 mb-4 relative z-10">
-              <div className="w-1 h-4 bg-secondary" />
-              <Video className="w-3.5 h-3.5 text-secondary" />
-              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-text">Video Servers</h3>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
+              <div className="w-1 h-4 bg-secondary" />
+              <Video className="w-3.5 h-3.5 text-secondary" />
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-text">Video Servers</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
               {episodeData?.allServers?.map((server: any) => (
                 <button
                   key={server.name}
@@ -512,11 +509,20 @@ export default function WatchContent({
                     setCurrentUrl(server.embed);
                     setCurrentServer(server.name);
                   }}
-                  className={cn(
-                    "px-3 py-2 bg-background/50 border-l-2 text-[10px] font-bold uppercase tracking-tighter hover:bg-secondary/10 hover:border-secondary hover:text-secondary transition-all",
-                    currentServer === server.name ? "border-secondary text-secondary bg-secondary/5" : "border-secondary/20 text-foreground/70"
-                  )}
-                >
+                  className="
+                    px-3 py-2
+                    bg-background/50
+                    border-l-2
+                    border-secondary/20
+                    text-[10px]
+                    font-bold
+                    uppercase
+                    tracking-tighter
+                    hover:bg-secondary/10
+                    hover:border-secondary
+                    hover:text-secondary
+                  "
+                >
                   {server.name}
                 </button>
               ))}
@@ -547,7 +553,7 @@ export default function WatchContent({
                   {quality.size && <span className="text-[9px] font-mono font-bold text-muted-text opacity-60 bg-foreground/5 px-1.5 py-0.5">{quality.size}</span>}
                 </div>
                 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-wrap gap-2">
                   {quality.urls?.map((item: any) => (
                     <a
                       key={item.title}
