@@ -17,9 +17,11 @@ import { getAnimeById } from '@/lib/services/anilist';
 
 export default function WatchContent({
   animeId,
+  type, // Keeping property definition for signature compatibility, though logic is forced to dub
   episode
 }: {
   animeId: string;
+  type: string;
   episode: string;
 }) {
   const router = useRouter();
@@ -155,11 +157,10 @@ export default function WatchContent({
       const data = await getWatch(
         "anikoto",
         Number(animeId),
-        "dub", // Strictly requesting dub from service layout
+        "dub",
         `anikoto-${episode}`
       );
       
-      // Forces choice to target only data.sdub
       const targetPayload = data?.sdub;
       
       if (targetPayload && targetPayload.streams) {
@@ -176,10 +177,8 @@ export default function WatchContent({
           downloadUrl: data?.downloadUrl || null
         });
 
-        // Autoselect strategy prefers clean embed variants over HLS streams if available, or goes default
         const preferredServer = 
-          mappedServers.find((s: any) => s.type === "embed" && s.isDefault) ||
-          mappedServers.find((s: any) => s.type === "embed") || 
+          mappedServers.find((s: any) => s.isDefault) || 
           mappedServers[0];
 
         if (preferredServer) {
@@ -207,8 +206,6 @@ export default function WatchContent({
   const fetchAnimeDataFrom = useCallback(async () => {
     try {
       const data = await getEpisodes(Number(animeId));
-      
-      // Enforces capturing only dub layout maps
       const providerEpisodes = data?.anikoto?.episodes?.dub;
 
       setAnimeData({
@@ -233,7 +230,7 @@ export default function WatchContent({
 
   if (loading) {
     return (
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <Skeleton className="h-10 w-96 mb-6 rounded-none" style={{ clipPath: 'polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px))' }} />
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-x-8 gap-y-6">
           <div className="space-y-4">
@@ -274,14 +271,14 @@ export default function WatchContent({
   }
 
   if (!episodeData) return (
-    <div className="max-w-[1440px] mx-auto px-4 py-20 text-center">
+    <div className="max-w-[1440px] mx-auto px-4 py-20 text-center w-full">
       <h2 className="text-xl font-bold">Episode not found</h2>
       <Link href="/" className="btn-primary mt-6 inline-block">Back to Home</Link>
     </div>
   );
 
   return (
-    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full overflow-x-hidden min-h-screen">
       {/* Breadcrumbs Status Bar */}
       <div
         className="flex items-center gap-3 bg-card px-5 py-2.5 mb-6 relative overflow-hidden text-[10px] font-black uppercase tracking-[0.2em] text-muted-text w-max max-w-full shadow-lg"
@@ -292,15 +289,16 @@ export default function WatchContent({
           <ChevronRight className="w-3 h-3 shrink-0 text-secondary" />
           <Link href={`/anime/${animeId}`} className="hover:text-foreground truncate max-w-[120px] sm:max-w-[200px] transition-colors">{displayTitle}</Link>
           <ChevronRight className="w-3 h-3 shrink-0 text-secondary" />
-          <span className="text-secondary truncate max-w-[150px] sm:max-w-[300px]">{episodeDisplay || displayTitle} (DUB)</span>
+          <span className="text-secondary truncate max-w-[150px] sm:max-w-[300px]">{episodeDisplay || displayTitle}</span>
         </div>
       </div>
 
       <div className={cn(
-        "grid gap-x-8 gap-y-6",
+        "grid gap-x-8 gap-y-6 w-full",
         isTheaterMode ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-[1fr_350px]"
       )}>
         
+        {/* Cinema Mode Overlay */}
         {isCinemaMode && (
           <div
             className="fixed inset-0 bg-black/95 backdrop-blur-sm z-[60] transition-all duration-500 cursor-pointer"
@@ -322,14 +320,14 @@ export default function WatchContent({
         )}
 
         {/* Video Column */}
-        <div className="space-y-4">
+        <div className="space-y-4 w-full overflow-hidden">
           <div className="lg:hidden mb-4 p-4 sm:p-5 bg-card border-l-4 border-secondary shadow-md">
-            <h1 className="text-base sm:text-lg font-serif font-black tracking-tighter uppercase leading-tight">{displayTitle}{episodeDisplay ? ` ${episodeDisplay}` : ''} (DUB)</h1>
+            <h1 className="text-base sm:text-lg font-serif font-black tracking-tighter uppercase leading-tight">{displayTitle}{episodeDisplay ? ` ${episodeDisplay}` : ''}</h1>
             <p className="text-secondary font-bold text-[10px] mt-2 tracking-[0.2em] uppercase opacity-60">Streaming</p>
           </div>
 
           <div className={cn(
-            "relative aspect-video bg-black border-b-4 border-secondary/20 shadow-2xl overflow-hidden group transition-all duration-500",
+            "relative aspect-video bg-black border-b-4 border-secondary/20 shadow-2xl overflow-hidden group transition-all duration-500 w-full",
             isCinemaMode ? 'shadow-[0_0_50px_rgba(34,197,94,0.15)] ring-1 ring-secondary/30 relative z-[60]' : ''
           )}>
             {serverLoading && (
@@ -356,16 +354,15 @@ export default function WatchContent({
             <div className="absolute inset-0 pointer-events-none border-x border-border z-10" />
           </div>
 
-          {/* Desktop Control Bar */}
-          <div className={cn("hidden lg:flex items-center gap-4", isCinemaMode ? "relative z-[60]" : "")}>
+          <div className={cn("hidden lg:flex items-center gap-4 w-full", isCinemaMode ? "relative z-[60]" : "")}>
             <div
-              className="px-6 py-4 bg-card shadow-lg relative overflow-hidden group flex-grow"
+              className="px-6 py-4 bg-card shadow-lg relative overflow-hidden group flex-grow min-w-0"
               style={{ clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%)' }}
             >
-              <div className="relative z-10">
-                <h1 className="text-xl font-serif font-black tracking-tighter uppercase leading-tight">{displayTitle}{episodeDisplay ? ` ${episodeDisplay}` : ''} (DUB)</h1>
-                <p className="text-secondary font-bold text-xs mt-2 tracking-[0.3em] uppercase opacity-60 flex items-center">
-                  <ServerDns className="w-3 h-3 mr-2" />
+              <div className="relative z-10 truncate">
+                <h1 className="text-xl font-serif font-black tracking-tighter uppercase leading-tight truncate">{displayTitle}{episodeDisplay ? ` ${episodeDisplay}` : ''}</h1>
+                <p className="text-secondary font-bold text-xs mt-2 tracking-[0.3em] uppercase opacity-60 flex items-center truncate">
+                  <ServerDns className="w-3 h-3 mr-2 shrink-0" />
                   Streaming from {currentServer || 'Primary Server'} {currentResolution && `• ${currentResolution}`}
                 </p>
               </div>
@@ -402,7 +399,7 @@ export default function WatchContent({
 
         {/* Sidebar Controls */}
         <div className={cn(
-          "w-full shrink-0 space-y-6",
+          "w-full shrink-0 space-y-6 overflow-hidden",
           isTheaterMode ? "grid grid-cols-1 md:grid-cols-2 gap-6 space-y-0" : ""
         )}>
           <div
@@ -448,7 +445,7 @@ export default function WatchContent({
             
             {animeData?.episodeList && animeData.episodeList.length > 0 && (
               <div className="mt-6 space-y-3 relative z-10">
-                <h4 className="font-bold text-xs uppercase tracking-[0.2em] text-muted-text">All Episodes (DUB)</h4>
+                <h4 className="font-bold text-xs uppercase tracking-[0.2em] text-muted-text">All Episodes</h4>
                 <div 
                   ref={scrollContainerRef}
                   className="grid grid-cols-5 gap-2 max-h-[130px] overflow-y-auto pr-2 custom-scrollbar"
@@ -491,7 +488,7 @@ export default function WatchContent({
 
           {/* Servers Panel */}
           <div
-            className="bg-card/50 border-l-4 border-secondary/30 p-6 space-y-6 relative h-full"
+            className="bg-card/50 border-l-4 border-secondary/30 p-6 space-y-6 relative h-full overflow-hidden"
             style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}
           >
             <div className="flex items-center space-x-2 border-b border-border pb-3 mb-4 relative z-10">
@@ -499,7 +496,7 @@ export default function WatchContent({
               <Video className="w-3.5 h-3.5 text-secondary" />
               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-text">Video Servers</h3>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 max-w-full">
               {episodeData?.allServers?.map((server: any) => (
                 <button
                   key={server.name}
@@ -508,7 +505,7 @@ export default function WatchContent({
                     setCurrentServer(server.name);
                   }}
                   className={cn(
-                    "px-3 py-2 bg-background/50 border-l-2 text-[10px] font-bold uppercase tracking-tighter hover:bg-secondary/10 hover:border-secondary hover:text-secondary transition-all",
+                    "px-3 py-2 bg-background/50 border-l-2 text-[10px] font-bold uppercase tracking-tighter hover:bg-secondary/10 hover:border-secondary hover:text-secondary transition-all truncate max-w-full",
                     currentServer === server.name ? "border-secondary text-secondary bg-secondary/5" : "border-secondary/20 text-foreground/70"
                   )}
                 >
@@ -521,10 +518,10 @@ export default function WatchContent({
 
       </div>
 
-      {/* Downloads */}
+      {/* Full-Width Bottom Download Links */}
       {episodeData?.downloadUrl?.qualities && episodeData.downloadUrl.qualities.length > 0 && (
         <div 
-          className="bg-card/50 border-y border-secondary/30 p-10 relative overflow-hidden mb-12 mt-8 lg:mt-12"
+          className="bg-card/50 border-y border-secondary/30 p-10 relative overflow-hidden mb-12 mt-8 lg:mt-12 w-full"
           style={{ clipPath: 'polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px)' }}
         >
           <div className="flex flex-col items-center mb-12 relative z-10 text-center">
@@ -534,22 +531,22 @@ export default function WatchContent({
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 relative z-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 relative z-10 w-full">
             {episodeData.downloadUrl.qualities.map((quality: any) => (
-              <div key={quality.title} className="space-y-4">
+              <div key={quality.title} className="space-y-4 min-w-0">
                 <div className="flex items-center justify-between border-b border-border pb-2 mb-2">
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary">{quality.title.replace('Mp4_', '')}</span>
-                  {quality.size && <span className="text-[9px] font-mono font-bold text-muted-text opacity-60 bg-foreground/5 px-1.5 py-0.5">{quality.size}</span>}
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-secondary truncate">{quality.title.replace('Mp4_', '')}</span>
+                  {quality.size && <span className="text-[9px] font-mono font-bold text-muted-text opacity-60 bg-foreground/5 px-1.5 py-0.5 shrink-0">{quality.size}</span>}
                 </div>
                 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 max-w-full">
                   {quality.urls?.map((item: any) => (
                     <a
                       key={item.title}
                       href={item.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-3 py-2 bg-background/50 border-l-2 border-secondary/20 text-[10px] font-bold uppercase tracking-tighter hover:bg-secondary/10 hover:border-secondary hover:text-secondary transition-all cursor-pointer text-left"
+                      className="px-3 py-2 bg-background/50 border-l-2 border-secondary/20 text-[10px] font-bold uppercase tracking-tighter hover:bg-secondary/10 hover:border-secondary hover:text-secondary transition-all cursor-pointer text-left truncate max-w-full"
                     >
                       {item.title}
                     </a>
