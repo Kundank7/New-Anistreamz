@@ -29,17 +29,18 @@ export default function WatchContent({
 
   const [episodeData, setEpisodeData] = useState<any>(null);
   const [animeData, setAnimeData] = useState<any>(null);
-const [animeTitle, setAnimeTitle] = useState('');
+  const [animeTitle, setAnimeTitle] = useState('');
   const [animeImg, setAnimeImg] = useState('');
   const [rawTitle, setRawTitle] = useState('');
   const [rawTitleEnglish, setRawTitleEnglish] = useState('');
 
   const displayTitle = titleLang === 'en' && rawTitleEnglish ? rawTitleEnglish : (rawTitle || animeTitle);
   const episodeDisplay = React.useMemo(() => {
-    if (!episodeData?.title) return '';
+    if (!episodeData?.title) return `Episode ${episode}`;
     const match = episodeData.title.match(/Episode\s*(\d+(\.\d+)?)/i);
     return match ? `Episode ${match[1]}` : episodeData.title;
-  }, [episodeData]);
+  }, [episodeData, episode]);
+
   const [currentUrl, setCurrentUrl] = useState<string>('');
   const [currentResolution, setCurrentResolution] = useState<string>('');
   const [currentServer, setCurrentServer] = useState<string>('');
@@ -60,15 +61,11 @@ const [animeTitle, setAnimeTitle] = useState('');
     
     const list = animeData.episodeList;
     const currentIndex = list.findIndex(
-	  (ep: any) => Number(ep.eps) === Number(episode)
-	);
+      (ep: any) => Number(ep.eps) === Number(episode)
+    );
     
     if (currentIndex === -1) return { prevEp: null, nextEp: null };
     
-    // In our DB (and EpisodeList component), episodes are typically ORDER BY eps_number DESC
-    // So index 0 is the NEWEST episode.
-    // Next episode (higher number) is index - 1
-    // Prev episode (lower number) is index + 1
     const next = currentIndex > 0 ? list[currentIndex - 1] : null;
     const prev = currentIndex < list.length - 1 ? list[currentIndex + 1] : null;
     
@@ -111,7 +108,6 @@ const [animeTitle, setAnimeTitle] = useState('');
   // Handle Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in an input
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) return;
 
       if (e.key === 'Escape' && isCinemaMode) {
@@ -124,14 +120,10 @@ const [animeTitle, setAnimeTitle] = useState('');
         setIsCinemaMode(prev => !prev);
       }
       if (e.key.toLowerCase() === 'n' && e.shiftKey && nextEp) {
-        router.push(
-		  `/watch/${animeId}/${type}/${nextEp.eps}`
-		);
+        router.push(`/watch/${animeId}/${type}/${nextEp.eps}`);
       }
       if (e.key.toLowerCase() === 'p' && e.shiftKey && prevEp) {
-        router.push(
-		  `/watch/${animeId}/${type}/${prevEp.eps}`
-		);
+        router.push(`/watch/${animeId}/${type}/${prevEp.eps}`);
       }
     };
 
@@ -139,21 +131,13 @@ const [animeTitle, setAnimeTitle] = useState('');
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [
-  isCinemaMode,
-  toggleTheaterMode,
-  prevEp,
-  nextEp,
-  router,
-  animeId,
-  type
-]);
+  }, [isCinemaMode, toggleTheaterMode, prevEp, nextEp, router, animeId, type]);
 
   const [historySaved, setHistorySaved] = useState(false);
   
   useEffect(() => {
-  setHistorySaved(false);
-}, [episode]);
+    setHistorySaved(false);
+  }, [episode]);
 
   useEffect(() => {
     if (!episodeData || !rawTitle || historySaved) return;
@@ -167,99 +151,97 @@ const [animeTitle, setAnimeTitle] = useState('');
     });
     markAsWatched(animeId, episode);
     setHistorySaved(true);
-  }, [episodeData, rawTitle, rawTitleEnglish, animeId, displayTitle, animeImg, episode, saveToHistory, markAsWatched, historySaved]);
+  }, [episodeData, rawTitle, rawTitleEnglish, animeId, displayTitle, animeImg, episode, saveToHistory, markAsWatched, historySaved, animeTitle]);
 
-const fetchEpisode = useCallback(async () => {
-  if (!animeId || !episode) return;
+  const fetchEpisode = useCallback(async () => {
+    if (!animeId || !episode) return;
 
-  setLoading(true);
+    setLoading(true);
 
-  try {
-    const data = await getWatch(
-	  "anikoto",
-	  Number(animeId),
-	  type,
-	  `anikoto-${episode}`
-	);
-	
-    setEpisodeData(data);
-	
-	if (data?.allServers?.length) {
-  setCurrentServer(data.allServers[0].name);
-}
-
-    if (data?.allServers?.length) {
-  const defaultServer =
-    data.allServers.find((s: any) => s.name === "HD-2") ||
-    data.allServers[0];
-
-  setCurrentServer(defaultServer.name);
-  setCurrentUrl(defaultServer.embed);
-}
-
-    const anime = await getAnimeById(animeId);
-
-    if (anime) {
-      setAnimeTitle(
-        anime.title?.english ||
-        anime.title?.romaji ||
-        ""
+    try {
+      const data = await getWatch(
+        "anikoto",
+        Number(animeId),
+        type,
+        `anikoto-${episode}`
       );
+      
+      // Anikoto payload nests the content inside the 'ssub' object
+      const ssubData = data?.ssub;
+      
+      if (ssubData && ssubData.streams) {
+        // Map native 'streams' to match your components structure (we prioritize type 'embed' to dodge CORS header locks)
+        const mappedServers = ssubData.streams.map((s: any) => ({
+          name: s.server,
+          embed: s.url,
+          type: s.type,
+          isDefault: s.default || false
+        }));
 
-      setAnimeImg(
-        anime.coverImage?.extraLarge ||
-        ""
-      );
+        setEpisodeData({
+          title: `Episode ${episode}`,
+          allServers: mappedServers,
+          downloadUrl: data?.downloadUrl || null
+        });
+
+        // Auto-select preferred fallback server (Default stream or structural embed options)
+        const preferredServer = 
+          mappedServers.find((s: any) => s.type === "embed" && s.isDefault) ||
+          mappedServers.find((s: any) => s.type === "embed") || 
+          mappedServers[0];
+
+        if (preferredServer) {
+          setCurrentServer(preferredServer.name);
+          setCurrentUrl(preferredServer.embed);
+        }
+      } else {
+        setEpisodeData(null);
+      }
+
+      const anime = await getAnimeById(animeId);
+      if (anime) {
+        setAnimeTitle(anime.title?.english || anime.title?.romaji || "");
+        setAnimeImg(anime.coverImage?.extraLarge || "");
+      }
+      
+    } catch (err) {
+      console.error(err);
+      setEpisodeData(null);
+    } finally {
+      setLoading(false);
     }
-	
-	const episodes = await getEpisodes(Number(animeId));
-	
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setLoading(false);
-  }
-}, [animeId, type, episode]);
+  }, [animeId, type, episode]);
 
   const fetchAnimeDataFrom = useCallback(async () => {
-  try {
-    const data = await getEpisodes(Number(animeId));
+    try {
+      const data = await getEpisodes(Number(animeId));
 
-    const episodeList =
-      type === "dub"
-        ? data?.anikoto?.dub || []
-        : data?.anikoto?.sub || [];
+      const providerEpisodes =
+        type === "dub"
+          ? data?.anikoto?.episodes?.dub
+          : data?.anikoto?.episodes?.sub;
 
-    const providerEpisodes =
-  type === "dub"
-    ? data?.anikoto?.episodes?.dub
-    : data?.anikoto?.episodes?.sub;
-
-setAnimeData({
-  episodeList: (providerEpisodes || []).map((ep: any) => ({
-    episodeId: ep.number,
-    eps: ep.number,
-    title: ep.title
-  }))
-});
-  } catch (err) {
-    console.error(err);
-  }
-}, [animeId, type]);
+      setAnimeData({
+        episodeList: (providerEpisodes || []).map((ep: any) => ({
+          episodeId: ep.number,
+          eps: ep.number,
+          title: ep.title || `Episode ${ep.number}`
+        }))
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  }, [animeId, type]);
 
   useEffect(() => {
     fetchEpisode();
   }, [fetchEpisode]);
   
   useEffect(() => {
-  fetchAnimeDataFrom();
-  
-}, [fetchAnimeDataFrom]);
-
-  const changeServer = async () => {};
+    fetchAnimeDataFrom();
+  }, [fetchAnimeDataFrom]);
 
   if (loading) {
-
     return (
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Skeleton className="h-10 w-96 mb-6 rounded-none" style={{ clipPath: 'polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px))' }} />
@@ -310,10 +292,6 @@ setAnimeData({
                   </div>
                 </div>
               ))}
-            </div>
-            <div className="lg:hidden p-6 bg-card">
-              <Skeleton className="h-6 w-3/4 rounded-none" />
-              <Skeleton className="h-3 w-24 mt-2 rounded-none" />
             </div>
           </div>
         </div>
@@ -480,8 +458,7 @@ setAnimeData({
                 </Tooltip>
               )}
             </div>
-			
-
+            
             {animeData?.episodeList && animeData.episodeList.length > 0 && (
               <div className="mt-6 space-y-3 relative z-10">
                 <h4 className="font-bold text-xs uppercase tracking-[0.2em] text-muted-text">All Episodes</h4>
@@ -497,7 +474,7 @@ setAnimeData({
                     return (
                       <Link
                         key={ep.episodeId}
-                        ref={isActive ? activeEpisodeRef : null}
+                        ref={isActive ? (activeEpisodeRef as any) : null}
                         href={`/watch/${animeId}/${type}/${ep.eps}`}
                         className={`w-full aspect-square flex items-center justify-center text-xs font-bold transition-all ${isActive
                             ? 'bg-secondary text-background shadow-[0_0_10px_rgba(34,197,94,0.3)] pointer-events-none'
@@ -533,36 +510,27 @@ setAnimeData({
               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-text">Video Servers</h3>
             </div>
             <div className="flex flex-wrap gap-2">
-  {episodeData?.allServers?.map((server: any) => (
-    <button
-      key={server.name}
-      onClick={() => {
-        setCurrentUrl(server.embed);
-        setCurrentServer(server.name);
-      }}
-      className="
-        px-3 py-2
-        bg-background/50
-        border-l-2
-        border-secondary/20
-        text-[10px]
-        font-bold
-        uppercase
-        tracking-tighter
-        hover:bg-secondary/10
-        hover:border-secondary
-        hover:text-secondary
-      "
-    >
-      {server.name}
-    </button>
-  ))}
-</div>
+              {episodeData?.allServers?.map((server: any) => (
+                <button
+                  key={server.name}
+                  onClick={() => {
+                    setCurrentUrl(server.embed);
+                    setCurrentServer(server.name);
+                  }}
+                  className={cn(
+                    "px-3 py-2 bg-background/50 border-l-2 text-[10px] font-bold uppercase tracking-tighter hover:bg-secondary/10 hover:border-secondary hover:text-secondary transition-all",
+                    currentServer === server.name ? "border-secondary text-secondary bg-secondary/5" : "border-secondary/20 text-foreground/70"
+                  )}
+                >
+                  {server.name}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Full-Width Bottom Download Links - Navigator Style with Centered Header */}
+      {/* Full-Width Bottom Download Links */}
       {episodeData?.downloadUrl?.qualities && episodeData.downloadUrl.qualities.length > 0 && (
         <div 
           className={cn(
@@ -571,7 +539,6 @@ setAnimeData({
           )}
           style={{ clipPath: 'polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px)' }}
         >
-          {/* Centered Integrated Header */}
           <div className="flex flex-col items-center mb-12 relative z-10 text-center">
             <div className="flex items-center space-x-3">
               <Download className="w-6 h-6 text-secondary" />
