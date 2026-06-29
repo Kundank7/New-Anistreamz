@@ -493,7 +493,7 @@ export default function WatchContent({
 
           {/* Servers Panel */}
           <div
-            className="bg-card/50 border-l-4 border-secondary/30 p-6 space-y-6 relative h-full"
+            className="bg-card/50 border-l-4 border-secondary/30 p-6 space-y-6 relative h-50%"
             style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}
           >
             <div className="flex items-center space-x-2 border-b border-border pb-3 mb-4 relative z-10">
