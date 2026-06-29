@@ -17,11 +17,9 @@ import { getAnimeById } from '@/lib/services/anilist';
 
 export default function WatchContent({
   animeId,
-  type, // Keeping property definition for signature compatibility, though logic is forced to dub
   episode
 }: {
   animeId: string;
-  type: string;
   episode: string;
 }) {
   const router = useRouter();
@@ -154,15 +152,14 @@ export default function WatchContent({
 
     setLoading(true);
     try {
-      // Forcing payload selection parameters specifically to "dub" context
       const data = await getWatch(
         "anikoto",
         Number(animeId),
-        "dub",
+        "dub", // Strictly requesting dub from service layout
         `anikoto-${episode}`
       );
       
-      // Directly matching your target "sdub" structural field payload
+      // Forces choice to target only data.sdub
       const targetPayload = data?.sdub;
       
       if (targetPayload && targetPayload.streams) {
@@ -179,9 +176,10 @@ export default function WatchContent({
           downloadUrl: data?.downloadUrl || null
         });
 
-        // Safe setup prioritization: matching structural default configs or first available node
+        // Autoselect strategy prefers clean embed variants over HLS streams if available, or goes default
         const preferredServer = 
-          mappedServers.find((s: any) => s.isDefault) || 
+          mappedServers.find((s: any) => s.type === "embed" && s.isDefault) ||
+          mappedServers.find((s: any) => s.type === "embed") || 
           mappedServers[0];
 
         if (preferredServer) {
@@ -209,8 +207,8 @@ export default function WatchContent({
   const fetchAnimeDataFrom = useCallback(async () => {
     try {
       const data = await getEpisodes(Number(animeId));
-
-      // Strictly query only the dubbed database stream index
+      
+      // Enforces capturing only dub layout maps
       const providerEpisodes = data?.anikoto?.episodes?.dub;
 
       setAnimeData({
@@ -294,7 +292,7 @@ export default function WatchContent({
           <ChevronRight className="w-3 h-3 shrink-0 text-secondary" />
           <Link href={`/anime/${animeId}`} className="hover:text-foreground truncate max-w-[120px] sm:max-w-[200px] transition-colors">{displayTitle}</Link>
           <ChevronRight className="w-3 h-3 shrink-0 text-secondary" />
-          <span className="text-secondary truncate max-w-[150px] sm:max-w-[300px]">{episodeDisplay || displayTitle}</span>
+          <span className="text-secondary truncate max-w-[150px] sm:max-w-[300px]">{episodeDisplay || displayTitle} (DUB)</span>
         </div>
       </div>
 
@@ -303,7 +301,6 @@ export default function WatchContent({
         isTheaterMode ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-[1fr_350px]"
       )}>
         
-        {/* Cinema Mode Overlay */}
         {isCinemaMode && (
           <div
             className="fixed inset-0 bg-black/95 backdrop-blur-sm z-[60] transition-all duration-500 cursor-pointer"
@@ -327,7 +324,7 @@ export default function WatchContent({
         {/* Video Column */}
         <div className="space-y-4">
           <div className="lg:hidden mb-4 p-4 sm:p-5 bg-card border-l-4 border-secondary shadow-md">
-            <h1 className="text-base sm:text-lg font-serif font-black tracking-tighter uppercase leading-tight">{displayTitle}{episodeDisplay ? ` ${episodeDisplay}` : ''}</h1>
+            <h1 className="text-base sm:text-lg font-serif font-black tracking-tighter uppercase leading-tight">{displayTitle}{episodeDisplay ? ` ${episodeDisplay}` : ''} (DUB)</h1>
             <p className="text-secondary font-bold text-[10px] mt-2 tracking-[0.2em] uppercase opacity-60">Streaming</p>
           </div>
 
@@ -359,13 +356,14 @@ export default function WatchContent({
             <div className="absolute inset-0 pointer-events-none border-x border-border z-10" />
           </div>
 
+          {/* Desktop Control Bar */}
           <div className={cn("hidden lg:flex items-center gap-4", isCinemaMode ? "relative z-[60]" : "")}>
             <div
               className="px-6 py-4 bg-card shadow-lg relative overflow-hidden group flex-grow"
               style={{ clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%)' }}
             >
               <div className="relative z-10">
-                <h1 className="text-xl font-serif font-black tracking-tighter uppercase leading-tight">{displayTitle}{episodeDisplay ? ` ${episodeDisplay}` : ''}</h1>
+                <h1 className="text-xl font-serif font-black tracking-tighter uppercase leading-tight">{displayTitle}{episodeDisplay ? ` ${episodeDisplay}` : ''} (DUB)</h1>
                 <p className="text-secondary font-bold text-xs mt-2 tracking-[0.3em] uppercase opacity-60 flex items-center">
                   <ServerDns className="w-3 h-3 mr-2" />
                   Streaming from {currentServer || 'Primary Server'} {currentResolution && `• ${currentResolution}`}
@@ -450,7 +448,7 @@ export default function WatchContent({
             
             {animeData?.episodeList && animeData.episodeList.length > 0 && (
               <div className="mt-6 space-y-3 relative z-10">
-                <h4 className="font-bold text-xs uppercase tracking-[0.2em] text-muted-text">All Episodes</h4>
+                <h4 className="font-bold text-xs uppercase tracking-[0.2em] text-muted-text">All Episodes (DUB)</h4>
                 <div 
                   ref={scrollContainerRef}
                   className="grid grid-cols-5 gap-2 max-h-[130px] overflow-y-auto pr-2 custom-scrollbar"
@@ -523,7 +521,7 @@ export default function WatchContent({
 
       </div>
 
-      {/* Full-Width Bottom Download Links */}
+      {/* Downloads */}
       {episodeData?.downloadUrl?.qualities && episodeData.downloadUrl.qualities.length > 0 && (
         <div 
           className="bg-card/50 border-y border-secondary/30 p-10 relative overflow-hidden mb-12 mt-8 lg:mt-12"
