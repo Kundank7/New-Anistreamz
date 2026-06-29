@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, Suspense, use, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getWatch, getEpisodes } from '@/lib/services/anivexa';
 import { useHistory } from '@/lib/hooks/useHistory';
@@ -12,6 +12,7 @@ import { motion } from 'motion/react';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { LazyIframe } from '@/components/ui/LazyIframe';
+import { HLSPlayer } from '@/components/ui/HLSPlayer'; // Placeholder for your HLS Player component
 import { cn } from '@/lib/utils';
 import { getAnimeById } from '@/lib/services/anilist';
 
@@ -31,11 +32,11 @@ export default function WatchContent({
   const [animeData, setAnimeData] = useState<any>(null);
   const [animeTitle, setAnimeTitle] = useState('');
   const [animeImg, setAnimeImg] = useState('');
-  const [rawTitle, setRawTitle] = useState('');
   const [rawTitleEnglish, setRawTitleEnglish] = useState('');
 
-  const displayTitle = titleLang === 'en' && rawTitleEnglish ? rawTitleEnglish : (rawTitle || animeTitle);
-  const episodeDisplay = React.useMemo(() => {
+  const displayTitle = titleLang === 'en' && rawTitleEnglish ? rawTitleEnglish : animeTitle;
+  
+  const episodeDisplay = useMemo(() => {
     if (!episodeData?.title) return `Episode ${episode}`;
     const match = episodeData.title.match(/Episode\s*(\d+(\.\d+)?)/i);
     return match ? `Episode ${match[1]}` : episodeData.title;
@@ -44,6 +45,12 @@ export default function WatchContent({
   const [currentUrl, setCurrentUrl] = useState<string>('');
   const [currentResolution, setCurrentResolution] = useState<string>('');
   const [currentServer, setCurrentServer] = useState<string>('');
+  const [watchType, setWatchType] = useState<'dub' | 'sub'>(type === 'dub' ? 'dub' : 'sub');
+  const [currentPlayerType, setCurrentPlayerType] = useState<'hls' | 'embed'>('embed');
+  const [subtitles, setSubtitles] = useState<any[]>([]);
+  const [intro, setIntro] = useState<any>(null);
+  const [outro, setOutro] = useState<any>(null);
+
   const [loading, setLoading] = useState(true);
   const [serverLoading, setServerLoading] = useState(false);
   const [isCinemaMode, setIsCinemaMode] = useState(false);
@@ -52,10 +59,16 @@ export default function WatchContent({
   const [forceLoadIframe, setForceLoadIframe] = useState(false);
   const { saveToHistory } = useHistory();
   const { markAsWatched } = useWatchedEpisodes();
-  const activeEpisodeRef = React.useRef<HTMLAnchorElement>(null);
-  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const activeEpisodeRef = useRef<HTMLAnchorElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const { prevEp, nextEp } = React.useMemo(() => {
+  // Sync watch type when URL type param changes
+  useEffect(() => {
+    setWatchType(type === "dub" ? "dub" : "sub");
+  }, [type]);
+
+  // Derived next/prev episodes from database list for better reliability
+  const { prevEp, nextEp } = useMemo(() => {
     if (!animeData?.episodeList || animeData.episodeList.length === 0) return { prevEp: null, nextEp: null };
     
     const list = animeData.episodeList;
@@ -71,6 +84,7 @@ export default function WatchContent({
     return { prevEp: prev, nextEp: next };
   }, [animeData, episode]);
 
+  // Auto-scroll to active episode
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     if (activeEpisodeRef.current && scrollContainerRef.current && !loading) {
@@ -87,6 +101,7 @@ export default function WatchContent({
     };
   }, [episode, loading, animeData]);
 
+  // Load Theater Mode preference
   useEffect(() => {
     const saved = localStorage.getItem('theaterMode');
     if (saved === 'true') {
@@ -102,6 +117,7 @@ export default function WatchContent({
     });
   }, []);
 
+  // Handle Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) return;
@@ -136,10 +152,10 @@ export default function WatchContent({
   }, [episode]);
 
   useEffect(() => {
-    if (!episodeData || !rawTitle || historySaved) return;
+    if (!episodeData || historySaved) return;
     saveToHistory({
       animeId,
-      animeTitle: rawTitle || animeTitle,
+      animeTitle: animeTitle,
       animeTitleEnglish: rawTitleEnglish || undefined,
       animeImage: animeImg,
       lastEpisodeId: episode,
@@ -147,13 +163,12 @@ export default function WatchContent({
     });
     markAsWatched(animeId, episode);
     setHistorySaved(true);
-  }, [episodeData, rawTitle, rawTitleEnglish, animeId, displayTitle, animeImg, episode, saveToHistory, markAsWatched, historySaved, animeTitle]);
+  }, [episodeData, rawTitleEnglish, animeId, animeImg, episode, saveToHistory, markAsWatched, historySaved, animeTitle]);
 
   const fetchEpisode = useCallback(async () => {
     if (!animeId || !episode) return;
 
     setLoading(true);
-
     try {
       const data = await getWatch(
         "anikoto",
@@ -162,51 +177,45 @@ export default function WatchContent({
         `anikoto-${episode}`
       );
       
-      const mappedServers: any[] = [];
-
-      // 1. Gather Sub Streams if available
-      if (data?.ssub?.streams) {
-        data.ssub.streams.forEach((s: any) => {
-          mappedServers.push({
-            name: `${s.server} (SUB)`,
-            embed: s.url,
-            type: s.type,
-            isDefault: s.default || false,
-            lang: 'sub'
-          });
-        });
-      }
-
-      // 2. Gather Dub Streams if available 
-      if (data?.sdub?.streams) {
-        data.sdub.streams.forEach((s: any) => {
-          mappedServers.push({
-            name: `${s.server} (DUB)`,
-            embed: s.url,
-            type: s.type,
-            isDefault: s.default || false,
-            lang: 'dub'
-          });
-        });
-      }
+      const targetPayload = type === "dub" ? data?.sdub : data?.ssub;
       
-      if (mappedServers.length > 0) {
+      if (targetPayload && targetPayload.streams) {
+        const mappedServers = targetPayload.streams.map((s: any) => ({
+          name: s.server,
+          url: s.url,
+          type: s.type,
+          referer: s.referer,
+          isDefault: s.default || false
+        }));
+
         setEpisodeData({
           title: `Episode ${episode}`,
           allServers: mappedServers,
+          subtitles: targetPayload.subtitles || [],
+          intro: targetPayload.intro || null,
+          outro: targetPayload.outro || null,
           downloadUrl: data?.downloadUrl || null
         });
 
-        // Smart auto-selection matching the route format context (prefers current sub/dub setting)
+        setSubtitles(targetPayload.subtitles || []);
+        setIntro(targetPayload.intro || null);
+        setOutro(targetPayload.outro || null);
+
+        // Restore preferred server selection if available
+        const savedServer = localStorage.getItem("preferred-server");
+        const saved = mappedServers.find((s: any) => s.name === savedServer);
+
         const preferredServer = 
-          mappedServers.find((s: any) => s.lang === type && s.type === "embed" && s.isDefault) ||
-          mappedServers.find((s: any) => s.lang === type && s.type === "embed") ||
-          mappedServers.find((s: any) => s.lang === type) ||
+          saved ||
+          mappedServers.find((s: any) => s.isDefault) ||
+          mappedServers.find((s: any) => s.type === "hls") ||
+          mappedServers.find((s: any) => s.type === "embed") || 
           mappedServers[0];
 
         if (preferredServer) {
           setCurrentServer(preferredServer.name);
-          setCurrentUrl(preferredServer.embed);
+          setCurrentUrl(preferredServer.url);
+          setCurrentPlayerType(preferredServer.type);
         }
       } else {
         setEpisodeData(null);
@@ -235,6 +244,14 @@ export default function WatchContent({
           ? data?.anikoto?.episodes?.dub
           : data?.anikoto?.episodes?.sub;
 
+      const hasDub = data?.anikoto?.episodes?.dub?.length > 0;
+
+		// Only redirect if type is missing
+		if (!type && hasDub) {
+			router.replace(`/watch/${animeId}/dub/${episode}`);
+			return;
+		}
+
       setAnimeData({
         episodeList: (providerEpisodes || []).map((ep: any) => ({
           episodeId: ep.number,
@@ -245,7 +262,7 @@ export default function WatchContent({
     } catch (err) {
       console.error(err);
     }
-  }, [animeId, type]);
+  }, [animeId, type, episode, router]);
 
   useEffect(() => {
     fetchEpisode();
@@ -337,6 +354,28 @@ export default function WatchContent({
         </div>
       </div>
 
+      {/* Sub/Dub Toggle Selection Header */}
+      <div className="flex gap-2 mb-4">
+        <Link
+          href={`/watch/${animeId}/dub/${episode}`}
+          className={cn(
+            "btn-primary px-4 py-2 text-xs font-bold uppercase tracking-wider",
+            watchType !== "dub" && "opacity-50"
+          )}
+        >
+          Dub
+        </Link>
+        <Link
+          href={`/watch/${animeId}/sub/${episode}`}
+          className={cn(
+            "btn-primary px-4 py-2 text-xs font-bold uppercase tracking-wider",
+            watchType !== "sub" && "opacity-50"
+          )}
+        >
+          Sub
+        </Link>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-x-8 gap-y-6">
         {/* Cinema Mode Overlay */}
         {isCinemaMode && (
@@ -356,7 +395,7 @@ export default function WatchContent({
           </div>
         )}
 
-        {/* Main Content: Video Player */}
+        {/* Main Content: Video Player Wrapper */}
         <motion.div layout transition={{ duration: 0.1, ease: 'easeInOut' }} className={`self-start ${isCinemaMode ? 'relative z-[60]' : ''} ${isTheaterMode ? 'lg:col-span-2' : 'lg:col-span-1'}`}>
           
           {/* Mobile Title */}
@@ -371,15 +410,28 @@ export default function WatchContent({
                 <Renew className="w-10 h-10 text-secondary animate-spin" />
               </div>
             )}
+            
+            {/* Conditional Video Stream/Embed Engine Integration */}
             {currentUrl && currentUrl !== 'No iframe found' ? (
-              <LazyIframe
-                src={currentUrl}
-                title="Episode Video Player"
-                poster={animeImg}
-                overlayText={episodeDisplay ? `PLAY ${episodeDisplay.toUpperCase()}` : "PLAY EPISODE"}
-                className="absolute inset-0 w-full h-full"
-                forceLoad={forceLoadIframe}
-              />
+              currentPlayerType === "embed" ? (
+                <LazyIframe
+                  src={currentUrl}
+                  title="Episode Video Player"
+                  poster={animeImg}
+                  overlayText={episodeDisplay ? `PLAY ${episodeDisplay.toUpperCase()}` : "PLAY EPISODE"}
+                  className="absolute inset-0 w-full h-full"
+                  forceLoad={forceLoadIframe}
+                />
+              ) : (
+                <LazyIframe
+				src={currentUrl}
+				title="Episode Video Player"
+				poster={animeImg}
+				overlayText={episodeDisplay ? `PLAY ${episodeDisplay.toUpperCase()}` : "PLAY EPISODE"}
+				className="absolute inset-0 w-full h-full"
+				forceLoad={forceLoadIframe}
+			/>
+              )
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center px-4">
                 <Video className="w-12 h-12 text-muted-text mb-4" />
@@ -389,7 +441,7 @@ export default function WatchContent({
             <div className="absolute inset-0 pointer-events-none border-x border-border z-10" />
           </div>
 
-          <div className={`hidden lg:flex items-center gap-4 transition-all duration-500 self-start ${isCinemaMode ? 'relative z-[60]' : ''} ${isTheaterMode ? 'lg:col-span-1 lg:col-start-1 lg:row-start-2' : 'lg:col-span-1 lg:col-start-1 lg:row-start-2'}`}>
+          <div className={`hidden lg:flex items-center gap-4 transition-all duration-500 self-start ${isCinemaMode ? 'relative z-[60]' : ''}`}>
             <div
               className="px-6 py-4 bg-card shadow-lg relative overflow-hidden group flex-grow"
               style={{ clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%)' }}
@@ -514,6 +566,7 @@ export default function WatchContent({
             </div>
           </div>
 
+          {/* Video Servers Interactive Panel */}
           <div
             className="bg-card/50 border-l-4 border-secondary/30 p-6 space-y-6 relative"
             style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}
@@ -526,10 +579,12 @@ export default function WatchContent({
             <div className="flex flex-wrap gap-2">
               {episodeData?.allServers?.map((server: any) => (
                 <button
-                  key={server.name}
+                  key={`${server.name}-${server.type}`}
                   onClick={() => {
-                    setCurrentUrl(server.embed);
+                    setCurrentUrl(server.url);
                     setCurrentServer(server.name);
+                    setCurrentPlayerType(server.type);
+                    localStorage.setItem("preferred-server", server.name);
                   }}
                   className={cn(
                     "px-3 py-2 bg-background/50 border-l-2 text-[10px] font-bold uppercase tracking-tighter hover:bg-secondary/10 hover:border-secondary hover:text-secondary transition-all",
