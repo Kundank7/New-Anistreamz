@@ -408,7 +408,7 @@ export default function WatchContent({
           isTheaterMode ? "grid grid-cols-1 md:grid-cols-2 gap-6 space-y-0" : ""
         )}>
           <div
-            className="bg-card/50 border-l-4 border-secondary/50 p-6 space-y-4 relative overflow-hidden h-full"
+            className="bg-card/50 border-l-4 border-secondary/50 p-6 space-y-4 relative overflow-hidden h-50"
             style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}
           >
             <div className="flex items-center space-x-2 border-b border-border pb-3 mb-4 relative z-10">
