@@ -12,7 +12,7 @@ import { motion } from 'motion/react';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { LazyIframe } from '@/components/ui/LazyIframe';
-import { HLSPlayer } from '@/components/ui/HLSPlayer'; // Placeholder for your HLS Player component
+// import { HLSPlayer } from '@/components/ui/HLSPlayer'; // Placeholder for your HLS Player component
 import { cn } from '@/lib/utils';
 import { getAnimeById } from '@/lib/services/anilist';
 
