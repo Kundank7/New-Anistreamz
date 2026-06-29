@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, Suspense, use, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getWatch, getEpisodes } from '@/lib/services/anivexa';
 import { useHistory } from '@/lib/hooks/useHistory';
@@ -8,20 +8,23 @@ import { useWatchedEpisodes } from '@/lib/hooks/useWatchedEpisodes';
 import { useTitleLang } from '@/lib/providers/TitleLangProvider';
 import { ChevronRight, Grid, Renew, Video, ServerDns, Screen, Theater, Download } from '@carbon/icons-react';
 import Link from 'next/link';
-import { motion } from 'motion/react';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { LazyIframe } from '@/components/ui/LazyIframe';
 import { cn } from '@/lib/utils';
 import { getAnimeById } from '@/lib/services/anilist';
 
+interface WatchContentProps {
+  animeId: string;
+  type: string; // ✅ Added to fix the Next.js compilation error
+  episode: string;
+}
+
 export default function WatchContent({
   animeId,
+  type, // ✅ Destructured for dynamic routing (sub vs dub)
   episode
-}: {
-  animeId: string;
-  episode: string;
-}) {
+}: WatchContentProps) {
   const router = useRouter();
   const { titleLang } = useTitleLang();
 
@@ -33,27 +36,29 @@ export default function WatchContent({
   const [rawTitleEnglish, setRawTitleEnglish] = useState('');
 
   const displayTitle = titleLang === 'en' && rawTitleEnglish ? rawTitleEnglish : (rawTitle || animeTitle);
-  const episodeDisplay = React.useMemo(() => {
+  
+  const episodeDisplay = useMemo(() => {
     if (!episodeData?.title) return `Episode ${episode}`;
     const match = episodeData.title.match(/Episode\s*(\d+(\.\d+)?)/i);
     return match ? `Episode ${match[1]}` : episodeData.title;
   }, [episodeData, episode]);
 
   const [currentUrl, setCurrentUrl] = useState<string>('');
-  const [currentResolution, setCurrentResolution] = useState<string>('');
+  const [currentResolution] = useState<string>('');
   const [currentServer, setCurrentServer] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [serverLoading, setServerLoading] = useState(false);
+  const [serverLoading] = useState(false);
   const [isCinemaMode, setIsCinemaMode] = useState(false);
   const [isTheaterMode, setIsTheaterMode] = useState(false);
   const [showExitHint, setShowExitHint] = useState(false);
-  const [forceLoadIframe, setForceLoadIframe] = useState(false);
+  const [forceLoadIframe] = useState(false);
+  
   const { saveToHistory } = useHistory();
   const { markAsWatched } = useWatchedEpisodes();
-  const activeEpisodeRef = React.useRef<HTMLAnchorElement>(null);
-  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const activeEpisodeRef = useRef<HTMLAnchorElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const { prevEp, nextEp } = React.useMemo(() => {
+  const { prevEp, nextEp } = useMemo(() => {
     if (!animeData?.episodeList || animeData.episodeList.length === 0) return { prevEp: null, nextEp: null };
     
     const list = animeData.episodeList;
@@ -114,10 +119,10 @@ export default function WatchContent({
         setIsCinemaMode(prev => !prev);
       }
       if (e.key.toLowerCase() === 'n' && e.shiftKey && nextEp) {
-        router.push(`/watch/${animeId}/dub/${nextEp.eps}`);
+        router.push(`/watch/${animeId}/${type}/${nextEp.eps}`);
       }
       if (e.key.toLowerCase() === 'p' && e.shiftKey && prevEp) {
-        router.push(`/watch/${animeId}/dub/${prevEp.eps}`);
+        router.push(`/watch/${animeId}/${type}/${prevEp.eps}`);
       }
     };
 
@@ -125,7 +130,7 @@ export default function WatchContent({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isCinemaMode, toggleTheaterMode, prevEp, nextEp, router, animeId]);
+  }, [isCinemaMode, toggleTheaterMode, prevEp, nextEp, router, animeId, type]);
 
   const [historySaved, setHistorySaved] = useState(false);
   
@@ -134,7 +139,8 @@ export default function WatchContent({
   }, [episode]);
 
   useEffect(() => {
-    if (!episodeData || !rawTitle || historySaved) return;
+    if (!episodeData || !displayTitle || historySaved) return;
+    
     saveToHistory({
       animeId,
       animeTitle: rawTitle || animeTitle,
@@ -145,26 +151,20 @@ export default function WatchContent({
     });
     markAsWatched(animeId, episode);
     setHistorySaved(true);
-  }, [episodeData, rawTitle, rawTitleEnglish, animeId, animeImg, episode, saveToHistory, markAsWatched, historySaved, animeTitle]);
+  }, [episodeData, displayTitle, rawTitle, rawTitleEnglish, animeId, animeImg, episode, saveToHistory, markAsWatched, historySaved, animeTitle]);
 
   const fetchEpisode = useCallback(async () => {
     if (!animeId || !episode) return;
 
     setLoading(true);
     try {
-      const data = await getWatch(
-        "anikoto",
-        Number(animeId),
-        "dub", // Strictly requesting dub from service layout
-        `anikoto-${episode}`
-      );
-      
-      // Forces choice to target only data.sdub
-      const targetPayload = data?.sdub;
+      // ✅ Dynamically requesting either sub or dub payload based on current routing parameter
+      const data = await getWatch("anikoto", Number(animeId), type, `anikoto-${episode}`);
+      const targetPayload = type === 'dub' ? data?.sdub : data?.ssub;
       
       if (targetPayload && targetPayload.streams) {
         const mappedServers = targetPayload.streams.map((s: any) => ({
-          name: `${s.server} (DUB)`,
+          name: `${s.server} (${type.toUpperCase()})`,
           embed: s.url,
           type: s.type,
           isDefault: s.default || false
@@ -176,7 +176,6 @@ export default function WatchContent({
           downloadUrl: data?.downloadUrl || null
         });
 
-        // Autoselect strategy prefers clean embed variants over HLS streams if available, or goes default
         const preferredServer = 
           mappedServers.find((s: any) => s.type === "embed" && s.isDefault) ||
           mappedServers.find((s: any) => s.type === "embed") || 
@@ -192,7 +191,11 @@ export default function WatchContent({
 
       const anime = await getAnimeById(animeId);
       if (anime) {
-        setAnimeTitle(anime.title?.english || anime.title?.romaji || "");
+        const engTitle = anime.title?.english || "";
+        const romTitle = anime.title?.romaji || "";
+        setAnimeTitle(engTitle || romTitle);
+        setRawTitle(romTitle);
+        setRawTitleEnglish(engTitle);
         setAnimeImg(anime.coverImage?.extraLarge || "");
       }
       
@@ -202,14 +205,13 @@ export default function WatchContent({
     } finally {
       setLoading(false);
     }
-  }, [animeId, episode]);
+  }, [animeId, episode, type]);
 
   const fetchAnimeDataFrom = useCallback(async () => {
     try {
       const data = await getEpisodes(Number(animeId));
-      
-      // Enforces capturing only dub layout maps
-      const providerEpisodes = data?.anikoto?.episodes?.dub;
+      // ✅ Dynamically targets either sub or dub layout collections from backend response maps
+      const providerEpisodes = data?.anikoto?.episodes?.[type];
 
       setAnimeData({
         episodeList: (providerEpisodes || []).map((ep: any) => ({
@@ -221,7 +223,7 @@ export default function WatchContent({
     } catch (err) {
       console.error(err);
     }
-  }, [animeId]);
+  }, [animeId, type]);
 
   useEffect(() => {
     fetchEpisode();
@@ -292,7 +294,7 @@ export default function WatchContent({
           <ChevronRight className="w-3 h-3 shrink-0 text-secondary" />
           <Link href={`/anime/${animeId}`} className="hover:text-foreground truncate max-w-[120px] sm:max-w-[200px] transition-colors">{displayTitle}</Link>
           <ChevronRight className="w-3 h-3 shrink-0 text-secondary" />
-          <span className="text-secondary truncate max-w-[150px] sm:max-w-[300px]">{episodeDisplay || displayTitle} (DUB)</span>
+          <span className="text-secondary truncate max-w-[150px] sm:max-w-[300px]">{episodeDisplay || displayTitle} ({type.toUpperCase()})</span>
         </div>
       </div>
 
@@ -324,7 +326,7 @@ export default function WatchContent({
         {/* Video Column */}
         <div className="space-y-4">
           <div className="lg:hidden mb-4 p-4 sm:p-5 bg-card border-l-4 border-secondary shadow-md">
-            <h1 className="text-base sm:text-lg font-serif font-black tracking-tighter uppercase leading-tight">{displayTitle}{episodeDisplay ? ` ${episodeDisplay}` : ''} (DUB)</h1>
+            <h1 className="text-base sm:text-lg font-serif font-black tracking-tighter uppercase leading-tight">{displayTitle}{episodeDisplay ? ` ${episodeDisplay}` : ''} ({type.toUpperCase()})</h1>
             <p className="text-secondary font-bold text-[10px] mt-2 tracking-[0.2em] uppercase opacity-60">Streaming</p>
           </div>
 
@@ -363,7 +365,7 @@ export default function WatchContent({
               style={{ clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%)' }}
             >
               <div className="relative z-10">
-                <h1 className="text-xl font-serif font-black tracking-tighter uppercase leading-tight">{displayTitle}{episodeDisplay ? ` ${episodeDisplay}` : ''} (DUB)</h1>
+                <h1 className="text-xl font-serif font-black tracking-tighter uppercase leading-tight">{displayTitle}{episodeDisplay ? ` ${episodeDisplay}` : ''} ({type.toUpperCase()})</h1>
                 <p className="text-secondary font-bold text-xs mt-2 tracking-[0.3em] uppercase opacity-60 flex items-center">
                   <ServerDns className="w-3 h-3 mr-2" />
                   Streaming from {currentServer || 'Primary Server'} {currentResolution && `• ${currentResolution}`}
@@ -418,7 +420,7 @@ export default function WatchContent({
               {prevEp ? (
                 <Tooltip content="Shift + P" position="top" wrapperClassName="w-full">
                   <Link
-                    href={`/watch/${animeId}/dub/${prevEp.eps}`}
+                    href={`/watch/${animeId}/${type}/${prevEp.eps}`}
                     className="btn-accent w-full py-2.5 text-[10px] tracking-[0.2em] flex items-center justify-center text-center"
                   >
                     Prev
@@ -433,7 +435,7 @@ export default function WatchContent({
               {nextEp ? (
                 <Tooltip content="Shift + N" position="top" wrapperClassName="w-full">
                   <Link
-                    href={`/watch/${animeId}/dub/${nextEp.eps}`}
+                    href={`/watch/${animeId}/${type}/${nextEp.eps}`}
                     className="btn-primary w-full py-2.5 text-[10px] tracking-[0.2em] flex items-center justify-center text-center"
                   >
                     Next
@@ -448,7 +450,7 @@ export default function WatchContent({
             
             {animeData?.episodeList && animeData.episodeList.length > 0 && (
               <div className="mt-6 space-y-3 relative z-10">
-                <h4 className="font-bold text-xs uppercase tracking-[0.2em] text-muted-text">All Episodes (DUB)</h4>
+                <h4 className="font-bold text-xs uppercase tracking-[0.2em] text-muted-text">All Episodes ({type.toUpperCase()})</h4>
                 <div 
                   ref={scrollContainerRef}
                   className="grid grid-cols-5 gap-2 max-h-[130px] overflow-y-auto pr-2 custom-scrollbar"
@@ -462,7 +464,7 @@ export default function WatchContent({
                       <Link
                         key={ep.episodeId}
                         ref={isActive ? (activeEpisodeRef as any) : null}
-                        href={`/watch/${animeId}/dub/${ep.eps}`}
+                        href={`/watch/${animeId}/${type}/${ep.eps}`}
                         className={cn(
                           "w-full aspect-square flex items-center justify-center text-xs font-bold transition-all",
                           isActive
@@ -491,7 +493,7 @@ export default function WatchContent({
 
           {/* Servers Panel */}
           <div
-            className="bg-card/50 border-l-4 border-secondary/30 p-6 space-y-6 relative h-40%"
+            className="bg-card/50 border-l-4 border-secondary/30 p-6 space-y-6 relative h-full"
             style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}
           >
             <div className="flex items-center space-x-2 border-b border-border pb-3 mb-4 relative z-10">
@@ -500,9 +502,9 @@ export default function WatchContent({
               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-text">Video Servers</h3>
             </div>
             <div className="flex flex-wrap gap-2">
-              {episodeData?.allServers?.map((server: any) => (
+              {episodeData?.allServers?.map((server: any, idx: number) => (
                 <button
-                  key={server.name}
+                  key={`${server.name}-${idx}`}
                   onClick={() => {
                     setCurrentUrl(server.embed);
                     setCurrentServer(server.name);
