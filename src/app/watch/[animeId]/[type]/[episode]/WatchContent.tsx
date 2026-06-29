@@ -166,13 +166,13 @@ export default function WatchContent({
         `anikoto-${episode}`
       );
       
-      // Anikoto payload nests the content inside the 'ssub' object
-      const ssubData = data?.ssub;
+      // Dynamic fallback extraction for sub (ssub) and dub (sdub) objects
+      const targetPayload = type === "dub" ? data?.sdub : data?.ssub;
       
-      if (ssubData && ssubData.streams) {
-        // Map native 'streams' to match your components structure (we prioritize type 'embed' to dodge CORS header locks)
-        const mappedServers = ssubData.streams.map((s: any) => ({
-          name: s.server,
+      if (targetPayload && targetPayload.streams) {
+        // Map native 'streams' to match component definitions
+        const mappedServers = targetPayload.streams.map((s: any) => ({
+          name: `${s.server} (${type.toUpperCase()})`,
           embed: s.url,
           type: s.type,
           isDefault: s.default || false
